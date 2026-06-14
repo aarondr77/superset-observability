@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Devin Security Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --panel-2: #243044;
+      --text: #e7edf5;
+      --muted: #94a3b8;
+      --border: #334155;
+      --accent: #3b82f6;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --purple: #a855f7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, var(--bg) 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 32px 24px 64px; }
+    header { margin-bottom: 28px; }
+    header h1 { margin: 0 0 8px; font-size: 1.75rem; font-weight: 700; }
+    header p { margin: 0; color: var(--muted); }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+    select, input {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .card .label { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
+    .card .value { font-size: 1.8rem; font-weight: 700; }
+    .card .sub { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .tab {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+    .tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--panel-2); color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    tr:last-child td { border-bottom: none; }
+    a { color: #93c5fd; text-decoration: none; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 4px;
+      margin-bottom: 4px;
+    }
+    .HIGH { background: rgba(239,68,68,.18); color: #fca5a5; }
+    .MEDIUM { background: rgba(234,179,8,.18); color: #fde047; }
+    .LOW { background: rgba(34,197,94,.18); color: #86efac; }
+    .status { padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .status.merged { background: rgba(34,197,94,.15); color: #86efac; }
+    .status.open { background: rgba(59,130,246,.15); color: #93c5fd; }
+    .status.no-action { background: rgba(148,163,184,.15); color: #cbd5e1; }
+    .role.engineer { color: #93c5fd; }
+    .role.non-engineer { color: #c4b5fd; }
+    .error { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35); color: #fecaca; padding: 14px; border-radius: 10px; margin-bottom: 16px; }
+    .loading { color: var(--muted); padding: 24px 0; }
+    @media (max-width: 900px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 560px) {
+      .stats { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Devin Security Dashboard</h1>
+      <p>Live observability for Bandit findings and Devin auto-remediation on Superset PRs</p>
+    </header>
+
+    <div id="error" class="error" hidden></div>
+    <div id="loading" class="loading">Loading session data…</div>
+
+    <section id="dashboard" hidden>
+      <div class="filters">
+        <div>
+          <label for="dateRange">Date range</label>
+          <select id="dateRange">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="all">All time</option>
+          </select>
+        </div>
+        <div>
+          <label for="contributorType">Contributor type</label>
+          <select id="contributorType">
+            <option value="all">All</option>
+            <option value="engineers">Engineers only</option>
+            <option value="non-engineers">Non-engineers only</option>
+          </select>
+        </div>
+        <div>
+          <label for="severity">Severity</label>
+          <select id="severity">
+            <option value="all">All</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+        </div>
+        <div>
+          <label for="search">Search</label>
+          <input id="search" type="search" placeholder="Name, email, manager…" />
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="card">
+          <div class="label">Action coverage</div>
+          <div class="value" id="statCoverage">—</div>
+          <div class="sub" id="statCoverageSub"></div>
+        </div>
+        <div class="card">
+          <div class="label">Total findings</div>
+          <div class="value" id="statFindings">—</div>
+          <div class="sub">Across filtered PRs</div>
+        </div>
+        <div class="card">
+          <div class="label">Remediation rate</div>
+          <div class="value" id="statRemediation">—</div>
+          <div class="sub" id="statRemediationSub"></div>
+        </div>
+        <div class="card">
+          <div class="label">Avg fix time</div>
+          <div class="value" id="statFixTime">—</div>
+          <div class="sub">Minutes for fixed findings</div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="prs">PR detail</button>
+        <button class="tab" data-tab="contributors">Contributors</button>
+      </div>
+
+      <div class="panel active" id="panel-prs">
+        <table>
+          <thead>
+            <tr>
+              <th>PR</th>
+              <th>Author</th>
+              <th>Findings</th>
+              <th>Fixed / Failed</th>
+              <th>Avg fix</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="prTable"></tbody>
+        </table>
+      </div>
+
+      <div class="panel" id="panel-contributors">
+        <table>
+          <thead>
+            <tr>
+              <th>Contributor</th>
+              <th>Manager</th>
+              <th>Role</th>
+              <th>PRs</th>
+              <th>Findings</th>
+              <th>Severity mix</th>
+            </tr>
+          </thead>
+          <tbody id="contributorTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const SESSIONS_URL =
+      "https://raw.githubusercontent.com/aarondr77/superset/master/devin-sessions.json";
+
+    let allData = [];
+    const filters = {
+      dateRange: "30",
+      contributorType: "all",
+      severity: "all",
+      search: "",
+    };
+
+    function pct(n, d) {
+      if (!d) return "0%";
+      return `${Math.round((n / d) * 100)}%`;
+    }
+
+    function avg(nums) {
+      if (!nums.length) return null;
+      return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
+    }
+
+    function inDateRange(dateStr, days) {
+      if (days === "all") return true;
+      const date = new Date(dateStr);
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - Number(days));
+      return date >= cutoff;
+    }
+
+    function matchesSearch(record, q) {
+      if (!q) return true;
+      const hay = [
+        record.pr_author,
+        record.pr_author_email,
+        record.pr_author_manager,
+        String(record.pr_number),
+      ].join(" ").toLowerCase();
+      return hay.includes(q.toLowerCase());
+    }
+
+    function filterFindings(findings, severity) {
+      if (severity === "all") return findings;
+      return findings.filter((f) => f.severity === severity);
+    }
+
+    function filterRecords(data) {
+      return data
+        .filter((r) => inDateRange(r.date, filters.dateRange))
+        .filter((r) => matchesSearch(r, filters.search))
+        .filter((r) => {
+          if (filters.contributorType === "engineers") return r.pr_author_is_engineer;
+          if (filters.contributorType === "non-engineers") return !r.pr_author_is_engineer;
+          return true;
+        })
+        .map((r) => ({
+          ...r,
+          findings: filterFindings(r.findings || [], filters.severity),
+        }))
+        .filter((r) => filters.severity === "all" || r.findings.length > 0 || !r.action_ran);
+    }
+
+    function renderStats(records) {
+      const totalPrs = records.length;
+      const actionRan = records.filter((r) => r.action_ran).length;
+      const allFindings = records.flatMap((r) => r.findings || []);
+      const fixedFindings = allFindings.filter((f) => f.fixed === true);
+      const fixTimes = fixedFindings.map((f) => f.fix_time_mins).filter((n) => typeof n === "number");
+
+      document.getElementById("statCoverage").textContent = pct(actionRan, totalPrs);
+      document.getElementById("statCoverageSub").textContent = `${actionRan} of ${totalPrs} PRs ran the action`;
+      document.getElementById("statFindings").textContent = allFindings.length;
+      document.getElementById("statRemediation").textContent = pct(fixedFindings.length, allFindings.length);
+      document.getElementById("statRemediationSub").textContent = `${fixedFindings.length} of ${allFindings.length} findings fixed`;
+      document.getElementById("statFixTime").textContent = fixTimes.length ? `${avg(fixTimes)}m` : "—";
+    }
+
+    function badges(findings) {
+      if (!findings.length) return '<span class="badge">none</span>';
+      return findings
+        .map((f) => `<span class="badge ${f.severity}">${f.rule}</span>`)
+        .join("");
+    }
+
+    function prStatus(record) {
+      if (!record.action_ran) return '<span class="status no-action">No scan</span>';
+      if (record.merged) return '<span class="status merged">Merged</span>';
+      return '<span class="status open">Open</span>';
+    }
+
+    function renderPrTable(records) {
+      const tbody = document.getElementById("prTable");
+      tbody.innerHTML = records.map((r) => {
+        const findings = r.findings || [];
+        const fixed = findings.filter((f) => f.fixed === true).length;
+        const failed = findings.filter((f) => f.fixed === false).length;
+        const fixTimes = findings.filter((f) => f.fixed === true && typeof f.fix_time_mins === "number").map((f) => f.fix_time_mins);
+        return `<tr>
+          <td><a href="${r.pr_url}" target="_blank" rel="noopener">#${r.pr_number}</a></td>
+          <td>${r.pr_author}<br><span style="color:var(--muted);font-size:.85rem">${r.pr_author_email}</span></td>
+          <td>${badges(findings)}</td>
+          <td>${fixed} / ${failed}</td>
+          <td>${fixTimes.length ? `${avg(fixTimes)}m` : "—"}</td>
+          <td>${prStatus(r)}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function renderContributors(records) {
+      const byAuthor = new Map();
+      for (const r of records) {
+        const key = r.pr_author_email;
+        if (!byAuthor.has(key)) {
+          byAuthor.set(key, {
+            name: r.pr_author,
+            email: r.pr_author_email,
+            manager: r.pr_author_manager,
+            isEngineer: r.pr_author_is_engineer,
+            prs: 0,
+            findings: [],
+          });
+        }
+        const entry = byAuthor.get(key);
+        entry.prs += 1;
+        entry.findings.push(...(r.findings || []));
+      }
+
+      const tbody = document.getElementById("contributorTable");
+      tbody.innerHTML = [...byAuthor.values()].map((c) => {
+        const mix = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+        c.findings.forEach((f) => { if (mix[f.severity] !== undefined) mix[f.severity] += 1; });
+        const mixText = Object.entries(mix).filter(([, n]) => n).map(([s, n]) => `${s}: ${n}`).join(" · ") || "—";
+        return `<tr>
+          <td>${c.name}<br><span style="color:var(--muted);font-size:.85rem">${c.email}</span></td>
+          <td>${c.manager}</td>
+          <td class="role ${c.isEngineer ? "engineer" : "non-engineer"}">${c.isEngineer ? "Engineer" : "Non-engineer"}</td>
+          <td>${c.prs}</td>
+          <td>${c.findings.length}</td>
+          <td>${mixText}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function render() {
+      const records = filterRecords(allData);
+      renderStats(records);
+      renderPrTable(records);
+      renderContributors(records);
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch(SESSIONS_URL);
+        if (!res.ok) throw new Error(`Failed to fetch sessions (${res.status})`);
+        allData = await res.json();
+        document.getElementById("loading").hidden = true;
+        document.getElementById("dashboard").hidden = false;
+        render();
+      } catch (err) {
+        document.getElementById("loading").hidden = true;
+        const box = document.getElementById("error");
+        box.hidden = false;
+        box.textContent = err.message;
+      }
+    }
+
+    document.querySelectorAll(".tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`panel-${btn.dataset.tab}`).classList.add("active");
+      });
+    });
+
+    document.getElementById("dateRange").addEventListener("change", (e) => {
+      filters.dateRange = e.target.value;
+      render();
+    });
+    document.getElementById("contributorType").addEventListener("change", (e) => {
+      filters.contributorType = e.target.value;
+      render();
+    });
+    document.getElementById("severity").addEventListener("change", (e) => {
+      filters.severity = e.target.value;
+      render();
+    });
+    document.getElementById("search").addEventListener("input", (e) => {
+      filters.search = e.target.value;
+      render();
+    });
+
+    loadData();
+  </script>
+</body>
+</html>
