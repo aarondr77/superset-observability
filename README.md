@@ -32,36 +32,46 @@ Press `Ctrl+C` to stop the container.
 
 ## Testing the full system (not just a simulation)
 
-To run through the full security scan and auto-remediation workflow yourself, work against the [Superset fork](https://github.com/aarondr77/superset) where the GitHub Actions and Devin integration are configured.
+Run the full security scan and auto-remediation workflow on **your own fork** of the [Superset demo repo](https://github.com/aarondr77/superset) with your own Devin API key.
 
-### 1. Create your branch, push, and open a PR
+### 1. Fork and configure GitHub Actions
 
-Branch off `introduce-vulnerabilities` into a timestamped `demo-{time}` branch. That branch already contains the five demo vulnerabilities listed below.
+1. Fork [github.com/aarondr77/superset](https://github.com/aarondr77/superset) to your GitHub account.
+2. On your fork, go to **Settings → Actions → General** and enable workflows. **I've disabled all of the workflows in this fork other than the new Devin security agent**.
+3. Go to **Settings → Secrets and variables → Actions** and add a repository secret:
+   - Name: `DEVIN_API_KEY`
+   - Value: your [Devin API key](https://docs.devin.ai/)
+4. Sync your fork's `master` with upstream (GitHub **Sync fork** button, or `git pull upstream master` after cloning). The demo branch only contains the injected vulnerabilities — the workflow pulls `.github/scripts/process_findings.py` from your fork's default branch at runtime.
+
+### 2. Create your branch, push, and open a PR
+
+Branch off `introduce-vulnerabilities` into a timestamped `demo-{time}` branch. That branch contains five intentionally injected Bandit findings (B324, B608, B105, B310, B602).
 
 ```bash
-git clone https://github.com/aarondr77/superset.git
+git clone https://github.com/<your-username>/superset.git
 cd superset
-git fetch origin introduce-vulnerabilities
-git checkout -b demo-$(date +%Y%m%d-%H%M%S) origin/introduce-vulnerabilities
+git remote add upstream https://github.com/aarondr77/superset.git
+git fetch upstream introduce-vulnerabilities
+git checkout -b demo-$(date +%Y%m%d-%H%M%S) upstream/introduce-vulnerabilities
 git push -u origin HEAD
-gh pr create --base master --title "$(git branch --show-current)"
 ```
 
-### 2. Trigger the security scan
+Open the PR against **your fork's `master`**, not the upstream repo.
 
-When the PR opens, a bot comment will appear with instructions. Comment on the PR:
+### 3. Trigger the security scan
 
-```
-@devin-error-detector
-```
+When the PR opens, a bot comment will appear with instructions. 
+
+If the bot does not leave the comment, click on the GitHub Actions tab and make sure the workflow is enabled.
+
+Then, comment `@devin-error-detector` on the PR:
 
 That triggers the **Security Scan + Auto-Remediation** GitHub Action. It runs Bandit, posts findings as a PR review comment, and kicks off Devin to remediate each issue sequentially.
 
-### 3. Watch remediation and review results
+### 4. Watch remediation and review results
 
 - Follow the PR for Bandit findings, Devin fix commits (e.g. `fix: remediate B602 in ...`), and the final scan summary.
-- Session data is logged to `devin-sessions.json` on `master`.
-- Run the dashboard locally (`docker compose up`) to explore remediation rate, fix times, and contributor attribution across past PRs.
+- Session data is logged to `devin-sessions.json` on your fork's `master`.
 
 ## How the system works
 

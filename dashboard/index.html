@@ -133,6 +133,17 @@
     .status.no-action { background: rgba(148,163,184,.15); color: #cbd5e1; }
     .role.engineer { color: #93c5fd; }
     .role.non-engineer { color: #c4b5fd; }
+    .disclaimer {
+      background: rgba(234,179,8,.1);
+      border: 1px solid rgba(234,179,8,.35);
+      color: #fde68a;
+      padding: 12px 14px;
+      border-radius: 10px;
+      margin-top: 16px;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .disclaimer a { color: #fde047; word-break: break-all; }
     .error { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35); color: #fecaca; padding: 14px; border-radius: 10px; margin-bottom: 16px; }
     .loading { color: var(--muted); padding: 24px 0; }
     @media (max-width: 900px) {
@@ -149,6 +160,10 @@
     <header>
       <h1>Devin Security Dashboard</h1>
       <p>Live observability for Bandit findings and Devin auto-remediation on Superset PRs</p>
+      <p class="disclaimer">
+        Demo disclaimer: session data is currently loaded from
+        <a href="https://raw.githubusercontent.com/aarondr77/superset/master/devin-sessions.json" target="_blank" rel="noopener">raw.githubusercontent.com/aarondr77/superset/master/devin-sessions.json</a>.
+      </p>
     </header>
 
     <div id="error" class="error" hidden></div>
@@ -255,7 +270,8 @@
   </div>
 
   <script>
-    const SESSIONS_URL = "./devin-sessions.json";
+    const SESSIONS_URL =
+      "https://raw.githubusercontent.com/aarondr77/superset/master/devin-sessions.json";
 
     let allData = [];
     const filters = {

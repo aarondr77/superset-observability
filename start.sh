@@ -20,7 +20,7 @@ cat <<'EOF'
 
     3. Press Ctrl+C in this terminal to stop the container
 
-  No credentials required — data loads from devin-sessions.json bundled with the dashboard.
+  No credentials required — data loads live from devin-sessions.json on the Superset fork.
 
 ================================================================================
 
