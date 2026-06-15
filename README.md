@@ -41,11 +41,16 @@ Run the full security scan and auto-remediation workflow on **your own fork** of
 3. Go to **Settings → Secrets and variables → Actions** and add a repository secret:
    - Name: `DEVIN_API_KEY`
    - Value: your [Devin API key](https://docs.devin.ai/)
-4. Sync your fork's `master` with upstream (GitHub **Sync fork** button, or `git pull upstream master` after cloning). The demo branch only contains the injected vulnerabilities — the workflow pulls `.github/scripts/process_findings.py` from your fork's default branch at runtime.
 
-### 2. Create your branch, push, and open a PR
+### 2. Connect Devin to your fork
 
-Branch off `introduce-vulnerabilities` into a timestamped `demo-{time}` branch. That branch contains five intentionally injected Bandit findings (B324, B608, B105, B310, B602).
+Devin pushes fix commits directly to your PR branch. The GitHub account linked to your Devin session must have **write access to your fork**.
+
+Use your own Devin API key with your own GitHub account connected in [Devin → Settings → Integrations → GitHub](https://app.devin.ai/settings/integrations).
+
+### 3. Create your branch, push, and open a PR
+
+Run the following commands to create your test branch. It will have five intentionally injected Bandit findings (B324, B608, B105, B310, B602).
 
 ```bash
 git clone https://github.com/<your-username>/superset.git
@@ -58,7 +63,7 @@ git push -u origin HEAD
 
 Open the PR against **your fork's `master`**, not the upstream repo.
 
-### 3. Trigger the security scan
+### 4. Trigger the security scan
 
 When the PR opens, a bot comment will appear with instructions. 
 
@@ -68,7 +73,7 @@ Then, comment `@devin-error-detector` on the PR:
 
 That triggers the **Security Scan + Auto-Remediation** GitHub Action. It runs Bandit, posts findings as a PR review comment, and kicks off Devin to remediate each issue sequentially.
 
-### 4. Watch remediation and review results
+### 5. Watch remediation and review results
 
 - Follow the PR for Bandit findings, Devin fix commits (e.g. `fix: remediate B602 in ...`), and the final scan summary.
 - Session data is logged to `devin-sessions.json` on your fork's `master`.
