@@ -1,5 +1,7 @@
 FROM python:3.11-slim
 WORKDIR /app
 COPY dashboard/ dashboard/
+COPY serve.py start.sh ./
+RUN chmod +x start.sh serve.py
 EXPOSE 8888
-CMD ["python", "-m", "http.server", "8888", "--directory", "dashboard"]
+CMD ["./start.sh"]

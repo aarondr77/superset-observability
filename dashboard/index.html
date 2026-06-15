@@ -50,11 +50,16 @@
       padding: 10px 12px;
       font-size: 0.95rem;
     }
-    .stats {
+    .stats-layout {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: minmax(260px, 1.15fr) 2fr;
       gap: 14px;
       margin-bottom: 24px;
+    }
+    .stats-secondary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
     }
     .card {
       background: var(--panel);
@@ -62,9 +67,37 @@
       border-radius: 14px;
       padding: 18px;
     }
+    .card.hero-metric {
+      background: linear-gradient(145deg, rgba(59,130,246,.22) 0%, var(--panel) 55%);
+      border-color: rgba(59,130,246,.5);
+      box-shadow: 0 0 0 1px rgba(59,130,246,.12), 0 18px 40px rgba(15,23,42,.35);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 100%;
+      padding: 28px 24px;
+    }
     .card .label { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
+    .card.hero-metric .label {
+      color: #93c5fd;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
     .card .value { font-size: 1.8rem; font-weight: 700; }
+    .card.hero-metric .value {
+      font-size: clamp(2.75rem, 5vw, 3.75rem);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      color: #fff;
+      margin-bottom: 10px;
+    }
     .card .sub { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+    .card.hero-metric .sub { font-size: 0.9rem; margin-top: 0; }
+    .stats-secondary .card .value { font-size: 1.55rem; }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
     .tab {
       background: transparent;
@@ -103,10 +136,11 @@
     .error { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35); color: #fecaca; padding: 14px; border-radius: 10px; margin-bottom: 16px; }
     .loading { color: var(--muted); padding: 24px 0; }
     @media (max-width: 900px) {
-      .stats { grid-template-columns: repeat(2, 1fr); }
+      .stats-layout { grid-template-columns: 1fr; }
+      .stats-secondary { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 560px) {
-      .stats { grid-template-columns: 1fr; }
+      .stats-secondary { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -154,26 +188,28 @@
         </div>
       </div>
 
-      <div class="stats">
-        <div class="card">
-          <div class="label">Action coverage</div>
-          <div class="value" id="statCoverage">—</div>
-          <div class="sub" id="statCoverageSub"></div>
+      <div class="stats-layout">
+        <div class="card hero-metric">
+          <div class="label">Median time to remediation</div>
+          <div class="value" id="statMedianFix">—</div>
+          <div class="sub" id="statMedianFixSub">Minutes for fixed findings</div>
         </div>
-        <div class="card">
-          <div class="label">Total findings</div>
-          <div class="value" id="statFindings">—</div>
-          <div class="sub">Across filtered PRs</div>
-        </div>
-        <div class="card">
-          <div class="label">Remediation rate</div>
-          <div class="value" id="statRemediation">—</div>
-          <div class="sub" id="statRemediationSub"></div>
-        </div>
-        <div class="card">
-          <div class="label">Avg fix time</div>
-          <div class="value" id="statFixTime">—</div>
-          <div class="sub">Minutes for fixed findings</div>
+        <div class="stats-secondary">
+          <div class="card">
+            <div class="label">Remediation rate</div>
+            <div class="value" id="statRemediation">—</div>
+            <div class="sub" id="statRemediationSub"></div>
+          </div>
+          <div class="card">
+            <div class="label">Action coverage</div>
+            <div class="value" id="statCoverage">—</div>
+            <div class="sub" id="statCoverageSub"></div>
+          </div>
+          <div class="card">
+            <div class="label">Total findings</div>
+            <div class="value" id="statFindings">—</div>
+            <div class="sub">Across filtered PRs</div>
+          </div>
         </div>
       </div>
 
@@ -187,10 +223,11 @@
           <thead>
             <tr>
               <th>PR</th>
+              <th>Date</th>
               <th>Author</th>
               <th>Findings</th>
               <th>Fixed / Failed</th>
-              <th>Avg fix</th>
+              <th>Median fix</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -203,6 +240,7 @@
           <thead>
             <tr>
               <th>Contributor</th>
+              <th>Last active</th>
               <th>Manager</th>
               <th>Role</th>
               <th>PRs</th>
@@ -217,8 +255,7 @@
   </div>
 
   <script>
-    const SESSIONS_URL =
-      "https://raw.githubusercontent.com/aarondr77/superset/master/devin-sessions.json";
+    const SESSIONS_URL = "./devin-sessions.json";
 
     let allData = [];
     const filters = {
@@ -233,9 +270,34 @@
       return `${Math.round((n / d) * 100)}%`;
     }
 
-    function avg(nums) {
+    function median(nums) {
       if (!nums.length) return null;
-      return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
+      const sorted = [...nums].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      if (sorted.length % 2 === 0) {
+        return Math.round(((sorted[mid - 1] + sorted[mid]) / 2) * 10) / 10;
+      }
+      return sorted[mid];
+    }
+
+    function formatMinutes(mins) {
+      if (mins === null) return "—";
+      return `${mins}m`;
+    }
+
+    function formatTimestamp(dateStr) {
+      if (!dateStr) return "—";
+      return new Date(dateStr).toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+
+    function sortByDateDesc(records) {
+      return [...records].sort((a, b) => new Date(b.date) - new Date(a.date));
     }
 
     function inDateRange(dateStr, days) {
@@ -263,19 +325,21 @@
     }
 
     function filterRecords(data) {
-      return data
-        .filter((r) => inDateRange(r.date, filters.dateRange))
-        .filter((r) => matchesSearch(r, filters.search))
-        .filter((r) => {
-          if (filters.contributorType === "engineers") return r.pr_author_is_engineer;
-          if (filters.contributorType === "non-engineers") return !r.pr_author_is_engineer;
-          return true;
-        })
-        .map((r) => ({
-          ...r,
-          findings: filterFindings(r.findings || [], filters.severity),
-        }))
-        .filter((r) => filters.severity === "all" || r.findings.length > 0 || !r.action_ran);
+      return sortByDateDesc(
+        data
+          .filter((r) => inDateRange(r.date, filters.dateRange))
+          .filter((r) => matchesSearch(r, filters.search))
+          .filter((r) => {
+            if (filters.contributorType === "engineers") return r.pr_author_is_engineer;
+            if (filters.contributorType === "non-engineers") return !r.pr_author_is_engineer;
+            return true;
+          })
+          .map((r) => ({
+            ...r,
+            findings: filterFindings(r.findings || [], filters.severity),
+          }))
+          .filter((r) => filters.severity === "all" || r.findings.length > 0 || !r.action_ran)
+      );
     }
 
     function renderStats(records) {
@@ -285,12 +349,17 @@
       const fixedFindings = allFindings.filter((f) => f.fixed === true);
       const fixTimes = fixedFindings.map((f) => f.fix_time_mins).filter((n) => typeof n === "number");
 
-      document.getElementById("statCoverage").textContent = pct(actionRan, totalPrs);
-      document.getElementById("statCoverageSub").textContent = `${actionRan} of ${totalPrs} PRs ran the action`;
-      document.getElementById("statFindings").textContent = allFindings.length;
+      const medianFix = median(fixTimes);
+
+      document.getElementById("statMedianFix").textContent = formatMinutes(medianFix);
+      document.getElementById("statMedianFixSub").textContent = fixTimes.length
+        ? `Based on ${fixTimes.length} fixed finding${fixTimes.length === 1 ? "" : "s"}`
+        : "No fixed findings in filter";
       document.getElementById("statRemediation").textContent = pct(fixedFindings.length, allFindings.length);
-      document.getElementById("statRemediationSub").textContent = `${fixedFindings.length} of ${allFindings.length} findings fixed`;
-      document.getElementById("statFixTime").textContent = fixTimes.length ? `${avg(fixTimes)}m` : "—";
+      document.getElementById("statRemediationSub").textContent = `${fixedFindings.length} of ${allFindings.length} fixed`;
+      document.getElementById("statCoverage").textContent = pct(actionRan, totalPrs);
+      document.getElementById("statCoverageSub").textContent = `${actionRan} of ${totalPrs} PRs scanned`;
+      document.getElementById("statFindings").textContent = allFindings.length;
     }
 
     function badges(findings) {
@@ -315,10 +384,11 @@
         const fixTimes = findings.filter((f) => f.fixed === true && typeof f.fix_time_mins === "number").map((f) => f.fix_time_mins);
         return `<tr>
           <td><a href="${r.pr_url}" target="_blank" rel="noopener">#${r.pr_number}</a></td>
+          <td>${formatTimestamp(r.date)}</td>
           <td>${r.pr_author}<br><span style="color:var(--muted);font-size:.85rem">${r.pr_author_email}</span></td>
           <td>${badges(findings)}</td>
           <td>${fixed} / ${failed}</td>
-          <td>${fixTimes.length ? `${avg(fixTimes)}m` : "—"}</td>
+          <td>${formatMinutes(median(fixTimes))}</td>
           <td>${prStatus(r)}</td>
         </tr>`;
       }).join("");
@@ -334,22 +404,30 @@
             email: r.pr_author_email,
             manager: r.pr_author_manager,
             isEngineer: r.pr_author_is_engineer,
+            lastActive: r.date,
             prs: 0,
             findings: [],
           });
         }
         const entry = byAuthor.get(key);
+        if (r.date && (!entry.lastActive || new Date(r.date) > new Date(entry.lastActive))) {
+          entry.lastActive = r.date;
+        }
         entry.prs += 1;
         entry.findings.push(...(r.findings || []));
       }
 
       const tbody = document.getElementById("contributorTable");
-      tbody.innerHTML = [...byAuthor.values()].map((c) => {
+      const contributors = [...byAuthor.values()].sort(
+        (a, b) => new Date(b.lastActive || 0) - new Date(a.lastActive || 0)
+      );
+      tbody.innerHTML = contributors.map((c) => {
         const mix = { HIGH: 0, MEDIUM: 0, LOW: 0 };
         c.findings.forEach((f) => { if (mix[f.severity] !== undefined) mix[f.severity] += 1; });
         const mixText = Object.entries(mix).filter(([, n]) => n).map(([s, n]) => `${s}: ${n}`).join(" · ") || "—";
         return `<tr>
           <td>${c.name}<br><span style="color:var(--muted);font-size:.85rem">${c.email}</span></td>
+          <td>${formatTimestamp(c.lastActive)}</td>
           <td>${c.manager}</td>
           <td class="role ${c.isEngineer ? "engineer" : "non-engineer"}">${c.isEngineer ? "Engineer" : "Non-engineer"}</td>
           <td>${c.prs}</td>
