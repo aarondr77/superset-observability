@@ -13,6 +13,8 @@ This system uses the Devin API to automatically detect and fix vulnerabilities i
 
 No credentials required. The dashboard loads tracked remediation data from the Superset fork.
 
+Clone this repo and then run this enviornment
+
 ```bash
 docker compose up
 ```
