@@ -1,4 +1,4 @@
-# Devin Security Governance for Apache Superset
+# Dashboard for Devin Bandit Review Bot
 
 ## What this project solves
 AI coding tools are exploding the number of contributors to Apache Superset. In 2024, Superset averaged around 78 contributors per quarter. By 2026-Q2 that number is 111 — an 18% year-over-year increase, and Q1 2026 saw a 45% jump over the previous quarter.
